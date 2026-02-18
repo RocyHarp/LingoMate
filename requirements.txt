@@ -1,0 +1,7 @@
+streamlit
+google-generativeai
+deep-translator
+requests
+pytesseract
+Pillow
+psycopg2-binary
