@@ -10,6 +10,18 @@ import time
 
 st.set_page_config(page_title="LingoMate", page_icon="⚡", layout="wide", initial_sidebar_state="collapsed")
 
+hide_streamlit_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            header {visibility: hidden;}
+            .viewerBadge_container {display: none !important;}
+            [data-testid="stCreatorBadge"] {display: none !important;}
+            [data-testid="stViewerBadge"] {display: none !important;}
+            </style>
+            """
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
 # --- CSS ---
 st.markdown("""
     <style>
