@@ -125,7 +125,23 @@ def get_daily_training_stats(user_id):
     finally:
         if conn: release_db_connection(conn)
 
-
+def get_words_for_smart_training(user_id, limit=10):
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        # Сортуємо слова: спочатку ті, де найбільше помилок (wrong_count DESC),
+        # а якщо помилок однаково, то перемішуємо випадково (RANDOM())
+        cursor.execute('''
+            SELECT * FROM words 
+            WHERE user_id = %s 
+            ORDER BY wrong_count DESC, RANDOM() 
+            LIMIT %s
+        ''', (user_id, limit))
+        return [dict(row) for row in cursor.fetchall()]
+    except: return []
+    finally:
+        if conn: release_db_connection(conn)
 # --- ФУНКЦІЇ ЗАПИСУ (При зміні даних ми очищаємо кеш) ---
 
 def clear_db_cache():
