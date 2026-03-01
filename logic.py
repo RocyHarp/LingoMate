@@ -11,7 +11,7 @@ warnings.filterwarnings("ignore")
 
 class backendLogic:
     def __init__(self):
-        self.api_keys = ["AIzaSyAdTf9QDtWG-NRqCZEdiRwJUJhD5RhDOCI"] 
+        self.api_keys = [st.secrets["GEMINI_API_KEY"]]
         self.safety_config = [
             {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
             {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
