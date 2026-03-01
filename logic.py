@@ -6,12 +6,15 @@ import requests
 import random
 import pytesseract
 from PIL import Image
+import streamlit as st  
 
 warnings.filterwarnings("ignore")
 
 class backendLogic:
     def __init__(self):
-        self.api_keys = [st.secrets["GEMINI_API_KEY"]]
+        # Ключ тепер береться з безпечного сейфа
+        self.api_keys = [st.secrets["GEMINI_API_KEY"]] 
+
         self.safety_config = [
             {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
             {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
@@ -25,8 +28,7 @@ class backendLogic:
             text = text.replace("```json", "").replace("```", "").strip()
             start = text.find("{")
             end = text.rfind("}")
-            if start != -1 and end != -1:
-                return text[start:end+1]
+            if start != -1 and end != -1: return text[start:end+1]
             return text
         except: return "{}"
 
@@ -39,32 +41,25 @@ class backendLogic:
                 return {"translation": trans, "context_ua": "", "vocabulary": []}
             except Exception as e: return {"translation": "Error", "context_ua": str(e), "vocabulary": []}
 
-        print(f"🚀 AI Аналіз...")
         for key in self.api_keys:
             genai.configure(api_key=key)
             for model_name in self.working_models:
                 try:
                     model = genai.GenerativeModel(model_name)
-                    prompt = f"""
-                    Act as an English/Ukrainian translator.
+                    prompt = f"""Act as an English/Ukrainian translator.
                     Task 1: Translate: "{text}" (Direction: {direction}).
                     Task 2: Explain grammar/context briefly in 'context_ua'.
                     Task 3: IF input is a sentence, extract key words/phrases to 'vocabulary'.
-                    Response MUST be strict JSON.
-                    """
+                    Response MUST be strict JSON."""
                     response = model.generate_content(prompt, safety_settings=self.safety_config, request_options={'timeout': 15})
                     if not response.parts: continue
                     return json.loads(self._clean_json_text(response.text))
-                except Exception as e:
-                    print(f"Translate Error {model_name}: {e}")
-                    continue
+                except Exception: continue
         try:
-            trans = GoogleTranslator(source='auto', target='uk').translate(text)
-            return {"translation": trans, "context_ua": "⚠️ AI Error / 404 (Перевір ключ або з'єднання)", "vocabulary": []}
+            return {"translation": GoogleTranslator(source='auto', target='uk').translate(text), "context_ua": "⚠️ AI Error", "vocabulary": []}
         except Exception as e: return {"translation": "Error", "context_ua": str(e), "vocabulary": []}
 
     def explain_nuance(self, word, context_sentence="", meaning=""):
-        print(f"💡 Пояснюю нюанс: {word}")
         context_info = f"Meaning: '{meaning}'" if not context_sentence and meaning else f"Context: '{context_sentence}'"
         for key in self.api_keys:
             genai.configure(api_key=key)
@@ -75,18 +70,17 @@ class backendLogic:
                     response = model.generate_content(prompt, safety_settings=self.safety_config, request_options={'timeout': 8})
                     if not response.candidates: return {"synonym_en": "N/A", "synonym_ua": "Блок", "explanation": "Google AI заблокував."}
                     return json.loads(self._clean_json_text(response.text))
-                except Exception as e: continue
+                except Exception: continue
         return {"synonym_en": "Error", "synonym_ua": "Помилка", "explanation": "Не вдалося підключитися до AI."}
 
     def get_text_from_image(self, image_path):
         try:
-            pytesseract.pytesseract.tesseract_cmd = '/opt/homebrew/bin/tesseract'
+            # Шлях для Мака видалено, сервер Linux сам знайде сканер
             return pytesseract.image_to_string(Image.open(image_path), lang='eng+ukr').strip()
         except Exception as e: return None
         
     def fetch_and_translate_words(self, count, use_ai=True):
         if use_ai:
-            print(f"🧠 AI генерує слова...")
             for key in self.api_keys:
                 genai.configure(api_key=key)
                 for model_name in self.working_models:
@@ -95,10 +89,8 @@ class backendLogic:
                         prompt = f"Generate {count} USEFUL English words (B1-C1). JSON List. Format: [{{'word': '...', 'meaning': '...', 'type': 'noun/verb/etc'}}]"
                         response = model.generate_content(prompt, request_options={'timeout': 20})
                         return json.loads(self._clean_json_text(response.text))
-                    except Exception as e: continue
-            print("⚠️ AI Failed.")
+                    except Exception: continue
 
-        print("🎲 Старий метод...")
         added = []
         try:
             all_words = requests.get("https://raw.githubusercontent.com/first20hours/google-10000-english/master/google-10000-english-usa-no-swears-medium.txt").text.splitlines()
@@ -113,7 +105,6 @@ class backendLogic:
         except: return []
 
     def find_synonyms(self, word, user_context_ua=""):
-        print(f"🔍 Шукаю синоніми до '{word}'...")
         result_list, seen_words = [], set()
         translator = GoogleTranslator(source='en', target='uk')
         context_en = ""
