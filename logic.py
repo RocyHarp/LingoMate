@@ -7,6 +7,7 @@ import random
 import pytesseract
 from PIL import Image
 import streamlit as st  
+import os
 
 warnings.filterwarnings("ignore")
 
@@ -73,11 +74,17 @@ class backendLogic:
                 except Exception: continue
         return {"synonym_en": "Error", "synonym_ua": "Помилка", "explanation": "Не вдалося підключитися до AI."}
 
-    def get_text_from_image(self, image_path):
+def get_text_from_image(self, image_path):
         try:
-            # Шлях для Мака видалено, сервер Linux сам знайде сканер
-            return pytesseract.image_to_string(Image.open(image_path), lang='eng+ukr').strip()
-        except Exception as e: return None
+            # Розумна перевірка: якщо ми на твоєму Mac, використовуємо твій шлях
+            if os.path.exists('/opt/homebrew/bin/tesseract'):
+                pytesseract.pytesseract.tesseract_cmd = '/opt/homebrew/bin/tesseract'
+                
+            text = pytesseract.image_to_string(Image.open(image_path), lang='eng+ukr').strip()
+            return text
+        except Exception as e:
+            # Якщо щось піде не так, ми побачимо текст помилки замість мовчання
+            return f"Помилка сканера: {str(e)}"
         
     def fetch_and_translate_words(self, count, use_ai=True):
         if use_ai:
