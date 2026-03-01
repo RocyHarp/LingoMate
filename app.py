@@ -2,9 +2,7 @@ import streamlit as st
 import time
 import database as db
 from logic import backendLogic
-from utils import get_xp_progress
-
-# Імпорт вкладок
+from utils import get_xp_progress, calc_level_from_raw_data
 from views import translate, dictionary, training, stats
 
 # --- 1. НАЛАШТУВАННЯ СТОРІНКИ ---
@@ -142,8 +140,8 @@ if col_menu:
             </div>
             """, unsafe_allow_html=True)
 
-            # --- 3. СТАТИСТИКА ---
-            total_w = len(db.get_all_words(st.session_state.user_id))
+            # --- 3. СТАТИСТИКА (ОПТИМІЗОВАНО) ---
+            total_w = db.get_word_count(st.session_state.user_id) # Швидка лічилка!
             stats_db = db.get_statistics(st.session_state.user_id)
             
             st.markdown(f"""
@@ -157,8 +155,7 @@ if col_menu:
                     <div class="menu-stat-label">Перекладів</div>
                 </div>
             </div>""", unsafe_allow_html=True)
-
-            # --- 4. ДРУЗІ ---
+            # --- 4. ДРУЗІ (ОПТИМІЗОВАНО) ---
             with st.expander("👥 Друзі та Рейтинг", expanded=True):
                 new_f = st.text_input("ID друга", label_visibility="collapsed", placeholder="Введи ID...", key="f_input_side")
                 if st.button("➕ Додати друга", use_container_width=True, key="add_friend_btn_side"):
@@ -172,12 +169,15 @@ if col_menu:
                     for f in friends:
                         f_name = f['username']
                         f_words = f.get('total_words', 0)
-                        try:
-                            f_id = db.get_user_id_by_username(f_name)
-                            f_lvl, _, _ = get_xp_progress(f_id)
-                            f_av = db.get_user_avatar(f_id)
-                        except:
-                            f_lvl, f_av = 1, "👤"
+                        
+                        # Миттєво рахуємо рівень друга з готових цифр:
+                        f_lvl = calc_level_from_raw_data(
+                            f['total_words'], 
+                            f['translations'], 
+                            f.get('total_correct', 0) if f.get('total_correct') else 0, 
+                            f.get('bonus_xp', 0)
+                        )
+                        f_av = f.get('avatar', '👤')
                             
                         st.markdown(f"""
                         <div class="friend-card">
