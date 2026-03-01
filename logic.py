@@ -11,18 +11,14 @@ warnings.filterwarnings("ignore")
 
 class backendLogic:
     def __init__(self):
-        # 👇 ВСТАВ СЮДИ СВІЙ КЛЮЧ
-        self.api_keys = [
-            "AIzaSyAdTf9QDtWG-NRqCZEdiRwJUJhD5RhDOCI" 
-        ]
-
-        # Знімаємо всі запобіжники (цензуру), щоб не блокувало "binding"
+        self.api_keys = ["AIzaSyAdTf9QDtWG-NRqCZEdiRwJUJhD5RhDOCI"] 
         self.safety_config = [
             {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
             {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
             {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
             {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
         ]
+        self.working_models = ['gemini-2.0-flash', 'gemini-1.5-flash']
 
     def _clean_json_text(self, text):
         try:
@@ -34,7 +30,6 @@ class backendLogic:
             return text
         except: return "{}"
 
-    # --- 1. ПЕРЕКЛАДАЧ ---
     def analyze_with_ai(self, text, direction="EN-UA", use_ai=True):
         if not use_ai:
             try:
@@ -42,16 +37,12 @@ class backendLogic:
                 else: src, trg = 'en', 'uk'
                 trans = GoogleTranslator(source=src, target=trg).translate(text)
                 return {"translation": trans, "context_ua": "", "vocabulary": []}
-            except Exception as e:
-                return {"translation": "Error", "context_ua": str(e), "vocabulary": []}
+            except Exception as e: return {"translation": "Error", "context_ua": str(e), "vocabulary": []}
 
         print(f"🚀 AI Аналіз...")
-        
-        models_priority = ['models/gemini-2.5-flash', 'models/gemini-2.0-flash']
-
         for key in self.api_keys:
             genai.configure(api_key=key)
-            for model_name in models_priority:
+            for model_name in self.working_models:
                 try:
                     model = genai.GenerativeModel(model_name)
                     prompt = f"""
@@ -61,137 +52,73 @@ class backendLogic:
                     Task 3: IF input is a sentence, extract key words/phrases to 'vocabulary'.
                     Response MUST be strict JSON.
                     """
-                    response = model.generate_content(
-                        prompt, 
-                        safety_settings=self.safety_config,
-                        request_options={'timeout': 15}
-                    )
-                    
-                    if not response.parts:
-                         continue
-                         
-                    clean_json = self._clean_json_text(response.text)
-                    return json.loads(clean_json)
+                    response = model.generate_content(prompt, safety_settings=self.safety_config, request_options={'timeout': 15})
+                    if not response.parts: continue
+                    return json.loads(self._clean_json_text(response.text))
                 except Exception as e:
                     print(f"Translate Error {model_name}: {e}")
                     continue
-
-        # Fallback
         try:
             trans = GoogleTranslator(source='auto', target='uk').translate(text)
-            return {"translation": trans, "context_ua": "⚠️ AI Error / 404", "vocabulary": []}
-        except Exception as e:
-            return {"translation": "Error", "context_ua": str(e), "vocabulary": []}
+            return {"translation": trans, "context_ua": "⚠️ AI Error / 404 (Перевір ключ або з'єднання)", "vocabulary": []}
+        except Exception as e: return {"translation": "Error", "context_ua": str(e), "vocabulary": []}
 
-    # --- 2. ПОЯСНЕННЯ НЮАНСІВ ---
     def explain_nuance(self, word, context_sentence="", meaning=""):
         print(f"💡 Пояснюю нюанс: {word}")
-        
-        models_priority = ['models/gemini-2.5-flash', 'models/gemini-2.0-flash']
-        
-        if not context_sentence and meaning:
-            context_info = f"Meaning: '{meaning}'"
-        else:
-            context_info = f"Context: '{context_sentence}'"
-
+        context_info = f"Meaning: '{meaning}'" if not context_sentence and meaning else f"Context: '{context_sentence}'"
         for key in self.api_keys:
             genai.configure(api_key=key)
-            for model_name in models_priority:
+            for model_name in self.working_models:
                 try:
                     model = genai.GenerativeModel(model_name)
-                    prompt = f"""
-                    Word: "{word}"
-                    {context_info}
-                    Task: Explain NUANCE in Ukrainian.
-                    JSON ONLY: {{ "synonym_en": "...", "synonym_ua": "...", "explanation": "..." }}
-                    """
-                    
-                    response = model.generate_content(
-                        prompt, 
-                        safety_settings=self.safety_config,
-                        request_options={'timeout': 8} 
-                    )
+                    prompt = f"""Word: "{word}"\n{context_info}\nTask: Explain NUANCE in Ukrainian.\nJSON ONLY: {{ "synonym_en": "...", "synonym_ua": "...", "explanation": "..." }}"""
+                    response = model.generate_content(prompt, safety_settings=self.safety_config, request_options={'timeout': 8})
+                    if not response.candidates: return {"synonym_en": "N/A", "synonym_ua": "Блок", "explanation": "Google AI заблокував."}
+                    return json.loads(self._clean_json_text(response.text))
+                except Exception as e: continue
+        return {"synonym_en": "Error", "synonym_ua": "Помилка", "explanation": "Не вдалося підключитися до AI."}
 
-                    if not response.candidates:
-                        return {
-                            "synonym_en": "N/A", 
-                            "synonym_ua": "Блок", 
-                            "explanation": "Google AI заблокував відповідь."
-                        }
-                    
-                    clean_json = self._clean_json_text(response.text)
-                    return json.loads(clean_json)
-                
-                except Exception as e:
-                    print(f"Nuance Error ({model_name}): {e}")
-                    continue
-        
-        return {
-            "synonym_en": "Error", 
-            "synonym_ua": "Помилка", 
-            "explanation": "Не вдалося підключитися до AI."
-        }
-
- # --- 3. СКАНЕР ФОТО (Легка версія через Tesseract) ---
     def get_text_from_image(self, image_path):
         try:
-            # ДОДАЙ ЦЕЙ РЯДОК (вказує шлях до Tesseract на Mac)
             pytesseract.pytesseract.tesseract_cmd = '/opt/homebrew/bin/tesseract'
-            
-            img = Image.open(image_path)
-            # eng+ukr означає, що він шукає і англійські, і українські літери
-            text = pytesseract.image_to_string(img, lang='eng+ukr')
-            return text.strip()
-        except Exception as e:
-            print(f"Помилка сканування фото: {e}")
-            return None
+            return pytesseract.image_to_string(Image.open(image_path), lang='eng+ukr').strip()
+        except Exception as e: return None
         
-    # --- 4. ГЕНЕРАТОР СЛІВ ---
     def fetch_and_translate_words(self, count, use_ai=True):
         if use_ai:
             print(f"🧠 AI генерує слова...")
-            models_priority = ['models/gemini-2.5-flash']
-            
             for key in self.api_keys:
                 genai.configure(api_key=key)
-                for model_name in models_priority:
+                for model_name in self.working_models:
                     try:
                         model = genai.GenerativeModel(model_name)
-                        prompt = f"Generate {count} USEFUL English words (B1-C1). JSON List."
+                        prompt = f"Generate {count} USEFUL English words (B1-C1). JSON List. Format: [{{'word': '...', 'meaning': '...', 'type': 'noun/verb/etc'}}]"
                         response = model.generate_content(prompt, request_options={'timeout': 20})
                         return json.loads(self._clean_json_text(response.text))
-                    except Exception as e:
-                        print(f"Gen Words Error: {e}")
-                        continue
+                    except Exception as e: continue
             print("⚠️ AI Failed.")
 
         print("🎲 Старий метод...")
         added = []
         try:
-            url = "https://raw.githubusercontent.com/first20hours/google-10000-english/master/google-10000-english-usa-no-swears-medium.txt"
-            all_words = requests.get(url).text.splitlines()
+            all_words = requests.get("https://raw.githubusercontent.com/first20hours/google-10000-english/master/google-10000-english-usa-no-swears-medium.txt").text.splitlines()
             chosen = random.sample(all_words[:3000], count + 5)
             translator = GoogleTranslator(source='en', target='uk')
             for w in chosen:
                 if len(added) >= count: break
                 if len(w) > 3:
-                    try:
-                        tr = translator.translate(w)
-                        added.append({"word": w, "meaning": tr, "type": "auto"})
+                    try: added.append({"word": w, "meaning": translator.translate(w), "type": "auto"})
                     except: continue
             return added
         except: return []
 
-    # --- 5. СИНОНІМИ ---
     def find_synonyms(self, word, user_context_ua=""):
         print(f"🔍 Шукаю синоніми до '{word}'...")
-        result_list = []
-        seen_words = set()
+        result_list, seen_words = [], set()
         translator = GoogleTranslator(source='en', target='uk')
         context_en = ""
         try:
-            if user_context_ua:
-                context_en = GoogleTranslator(source='uk', target='en').translate(user_context_ua)
+            if user_context_ua: context_en = GoogleTranslator(source='uk', target='en').translate(user_context_ua)
         except: pass
         if context_en and context_en.lower() != word.lower():
             try:
@@ -204,8 +131,7 @@ class backendLogic:
                 for item in resp:
                     if len(result_list) >= 3: return
                     syn = item['word'].lower()
-                    if syn == word.lower(): continue
-                    if syn in seen_words: continue
+                    if syn == word.lower() or syn in seen_words: continue
                     try:
                         tr = translator.translate(syn)
                         if tr.lower() == syn: continue
