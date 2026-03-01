@@ -332,6 +332,17 @@ def update_daily_training_stats(user_id, is_correct, time_spent_sec):
     except: pass
     finally: 
         if conn: release_db_connection(conn)
+def get_word_count(user_id):
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT COUNT(id) FROM words WHERE user_id = %s', (user_id,))
+        res = cursor.fetchone()
+        return res[0] if res else 0
+    except: return 0
+    finally:
+        if conn: release_db_connection(conn)
 
 # ==========================================
 # ОНОВЛЕНІ ФУНКЦІЇ ДЛЯ АВАТАРІВ, ЮЗЕРНЕЙМІВ ТА XP
