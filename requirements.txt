@@ -1,7 +1,9 @@
 streamlit
+pandas
+altair
 google-generativeai
 deep-translator
-requests
 pytesseract
 Pillow
+requests
 psycopg2-binary
