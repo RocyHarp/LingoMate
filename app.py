@@ -2,15 +2,20 @@ import streamlit as st
 import time
 import database as db
 from logic import backendLogic
-from utils import get_xp_progress, calc_level_from_raw_data
+# 🔥 ДОДАНО НОВІ ФУНКЦІЇ З UTILS
+from utils import get_xp_progress, calc_level_from_raw_data, get_user_achievements
+
+# Імпорт вкладок
 from views import translate, dictionary, training, stats
 
 # --- 1. НАЛАШТУВАННЯ СТОРІНКИ ---
 st.set_page_config(page_title="LingoMate", page_icon="⚡", layout="wide", initial_sidebar_state="collapsed")
 
 def load_css(file_name):
-    with open(file_name, "r") as f:
-        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+    try:
+        with open(file_name, "r") as f:
+            st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+    except: pass
 load_css("style.css")
 
 db.init_db()
@@ -140,8 +145,8 @@ if col_menu:
             </div>
             """, unsafe_allow_html=True)
 
-            # --- 3. СТАТИСТИКА (ОПТИМІЗОВАНО) ---
-            total_w = db.get_word_count(st.session_state.user_id) # Швидка лічилка!
+            # --- 3. СТАТИСТИКА (ОПТИМІЗОВАНО ВІД ЛАГІВ) ---
+            total_w = db.get_word_count(st.session_state.user_id) # 🔥 Швидкий запит замість len(all_words)
             stats_db = db.get_statistics(st.session_state.user_id)
             
             st.markdown(f"""
@@ -155,7 +160,31 @@ if col_menu:
                     <div class="menu-stat-label">Перекладів</div>
                 </div>
             </div>""", unsafe_allow_html=True)
-            # --- 4. ДРУЗІ (ОПТИМІЗОВАНО) ---
+
+            # --- 4. ДОСЯГНЕННЯ (НОВИЙ ДИЗАЙН З ЗАМОЧКАМИ) ---
+            with st.expander("🏆 Мої Досягнення", expanded=False):
+                achievements, _ = get_user_achievements(st.session_state.user_id)
+                for ach in achievements:
+                    if ach['unlocked']:
+                        st.markdown(f"""
+                        <div style="display:flex; align-items:center; background:#1e293b; padding:10px; border-radius:8px; margin-bottom:8px; border: 1px solid #4ade80;">
+                            <div style="font-size:24px; margin-right:15px;">{ach['icon']}</div>
+                            <div>
+                                <div style="font-weight:bold; color:#f8fafc; font-size:13px;">{ach['name']} <span style='color:#fbbf24; font-size:10px;'>+{ach['xp']} XP</span></div>
+                                <div style="font-size:11px; color:#94a3b8;">{ach['desc']}</div>
+                            </div>
+                        </div>""", unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"""
+                        <div style="display:flex; align-items:center; background:#0f172a; padding:10px; border-radius:8px; margin-bottom:8px; opacity: 0.5;">
+                            <div style="font-size:24px; margin-right:15px; filter: grayscale(100%);">🔒</div>
+                            <div>
+                                <div style="font-weight:bold; color:#64748b; font-size:13px;">{ach['name']}</div>
+                                <div style="font-size:11px; color:#64748b;">{ach['desc']}</div>
+                            </div>
+                        </div>""", unsafe_allow_html=True)
+
+            # --- 5. ДРУЗІ ТА РЕЙТИНГ (ОПТИМІЗОВАНО ВІД ЛАГІВ) ---
             with st.expander("👥 Друзі та Рейтинг", expanded=True):
                 new_f = st.text_input("ID друга", label_visibility="collapsed", placeholder="Введи ID...", key="f_input_side")
                 if st.button("➕ Додати друга", use_container_width=True, key="add_friend_btn_side"):
@@ -170,7 +199,7 @@ if col_menu:
                         f_name = f['username']
                         f_words = f.get('total_words', 0)
                         
-                        # Миттєво рахуємо рівень друга з готових цифр:
+                        # 🔥 Швидка математика без навантаження бази
                         f_lvl = calc_level_from_raw_data(
                             f['total_words'], 
                             f['translations'], 
@@ -189,7 +218,7 @@ if col_menu:
                         </div>""", unsafe_allow_html=True)
                 else: st.caption("Ти поки що самотній вовк 🐺")
 
-            # --- 5. РОЗШИРЕНІ НАЛАШТУВАННЯ ---
+            # --- 6. РОЗШИРЕНІ НАЛАШТУВАННЯ ---
             with st.expander("⚙️ Налаштування акаунта", expanded=False):
                 st.markdown("**Змінити Нікнейм**")
                 new_nick = st.text_input("Новий нік", value=st.session_state.username, label_visibility="collapsed", key="change_nick_in")
