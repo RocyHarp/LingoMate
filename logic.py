@@ -20,7 +20,7 @@ class backendLogic:
             {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
             {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
         ]
-        self.working_models = ['gemini-2.5-flash', 'gemini-2.0-pro']
+        self.working_models = ['gemini-2.5-flash', 'gemini-2.5-pro']
 
     def _clean_json_text(self, text):
         try:
